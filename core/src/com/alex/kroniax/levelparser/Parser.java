@@ -9,6 +9,7 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
@@ -105,13 +106,18 @@ public class Parser {
         for (int i = 0; i < nodes.getLength(); i++) {
             if (nodes.item(i) instanceof Element) {
                 Element node = (Element) nodes.item(i);
-                if (node.getNodeName() == "tileset") {
+                if (node.getNodeName() == "properties") {
+                    parseMapProperties((Element) node);
+                } else if (node.getNodeName() == "tileset") {
                     mMap.mTilesets.add(new Tileset());
                     if (!mMap.mTilesets.get(mMap.mTilesets.size() - 1).parse((Element) node, errorText))
                         return false;
                 } else if (node.getNodeName() == "layer") {
                     mMap.mLayers.add(new Layer());
                     if (!mMap.mLayers.get(mMap.mLayers.size() - 1).parse((Element) node, errorText))
+                        return false;
+                } else if (node.getNodeName() == "objectgroup") {
+                    if (!mMap.parseObjectGroup((Element) node, errorText))
                         return false;
                 }
             }
@@ -120,4 +126,14 @@ public class Parser {
         return true;
     }
 
+    private void parseMapProperties(Element props) {
+        NodeList properties = props.getElementsByTagName("property");
+        for (int i = 0; i < properties.getLength(); i++) {
+            Element ele = (Element) properties.item(i);
+            NamedNodeMap attribtutes = ele.getAttributes();
+            for (int j = 0; j + 1 < attribtutes.getLength(); j += 2) {
+                mMap.mProperties.put(attribtutes.item(j).getNodeValue(), attribtutes.item(j + 1).getNodeValue());
+            }
+        }
+    }
 }

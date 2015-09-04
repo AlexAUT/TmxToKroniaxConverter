@@ -95,7 +95,7 @@ public class Application extends ApplicationAdapter {
         table.row();
 
         VisLabel info = new VisLabel(
-                "The .aw file will be generated in the same directory with the same\nname but the the aw extension");
+                "The level file will be generated into the same folder with the same\nname but with the .kroniax extension");
         table.add(info).width(480);
 
         table.pack();

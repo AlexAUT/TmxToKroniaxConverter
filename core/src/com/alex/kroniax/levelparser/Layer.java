@@ -1,6 +1,7 @@
 package com.alex.kroniax.levelparser;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -12,9 +13,9 @@ public class Layer {
     public String name;
     public String width, height;
     public ArrayList<String> data;
-    
+
     public Map<String, String> properties;
-    
+
     public Layer() {
         data = new ArrayList<String>();
         properties = new HashMap<String, String>();
@@ -39,13 +40,13 @@ public class Layer {
             return false;
         }
         height = node.getAttribute("height");
-        
-        //Check for properties
+
+        // Check for properties
         NodeList propertiesTags = node.getElementsByTagName("properties");
-        for(int i = 0; i < propertiesTags.getLength(); i++)
-            parseProperties((Element)propertiesTags.item(i));
-        
-        //Check for the data of the layer
+        for (int i = 0; i < propertiesTags.getLength(); i++)
+            parseProperties((Element) propertiesTags.item(i));
+
+        // Check for the data of the layer
         NodeList dataTags = node.getElementsByTagName("data");
 
         if (dataTags.getLength() == 0) {
@@ -68,62 +69,82 @@ public class Layer {
         String data = dataTag.getTextContent();
 
         processData(data);
-        
+
         return true;
     }
     
-    private boolean processData(String data){
+    final int FLIPPED_HORIZONTALLY_FLAG = 0x80000000;
+    final int FLIPPED_VERTICALLY_FLAG   = 0x40000000;
+    final int FLIPPED_DIAGONALLY_FLAG   = 0x20000000;
+
+    private boolean processData(String data) {
         String lines[] = data.split("\\r?\\n");
-        if(lines.length < 3)
+        if (lines.length < 3)
             return false;
-        int startRow = 0;
-        if(lines[0].length() == 0)
-            startRow++;
-        
+
+        while (lines[0].length() == 0)
+            lines = Arrays.copyOfRange(lines, 1, lines.length);
         ArrayList<String[]> valueGrid = new ArrayList<String[]>();
-        
-        for(String row : lines) {
+
+        for (String row : lines) {
             valueGrid.add(row.split(","));
         }
-        System.out.println(valueGrid.get(startRow).length);
-        for(int col = 0; col < valueGrid.get(startRow).length; col++) {
-            
-            int startValue = startRow;
+        //Count the continuous empty lines
+        int sinceLastRow = 0;
+        
+        for (int col = 0; col < valueGrid.get(0).length; col++) {
+
             boolean foundStart = false;
-            int endValue = 0;
             
+            int sinceLastValue = 0;
+
             StringBuilder colData = new StringBuilder();
-            
-            for(int row = startRow; row < valueGrid.size(); row++) {
-                int value = Integer.parseInt(valueGrid.get(row)[col]);
-                if(value != 0) {
-                    endValue = row;
-                    if(!foundStart) {
-                        startValue = row;
+
+            for (int row = 0; row < valueGrid.size(); row++) {
+                long value_long = Long.parseLong(valueGrid.get(row)[col]);
+                value_long &= ~(FLIPPED_HORIZONTALLY_FLAG | FLIPPED_VERTICALLY_FLAG | FLIPPED_DIAGONALLY_FLAG);
+                int value = (int) value_long;
+                if (value != 0) {
+                    if (!foundStart) {
+                        //Write the empty lines cache
+                        if(sinceLastRow > 0) {
+                            this.data.add(new String("x " + sinceLastRow));
+                            sinceLastRow = 0;
+                        }
+                        
+                        colData.append(row + " " + value);
                         foundStart = true;
+                        sinceLastValue = 0;
+                    } else {
+                        //Write cached 0 values
+                        if(sinceLastValue > 0) {
+                            colData.append(" x " + sinceLastValue);
+                            sinceLastValue = 0;
+                        }
+                        colData.append(" " + value);
                     }
+                } else {
+                    sinceLastValue++;
                 }
             }
-            System.out.println(startValue + " | " + endValue);
-            //Now we have start and end value, write the information into data
-            colData.append(startValue);
-            for(int row = startValue; row <= endValue; row++){
-                colData.append(" ");
-                colData.append(valueGrid.get(row)[col]);
-            }
-            this.data.add(colData.toString());
+            // Check if we have an empty line
+            if(!foundStart)
+                sinceLastRow++;
+            // Now we have start and end value, write the information into data
+            if(colData.length() > 0)
+                this.data.add(colData.toString());
         }
-        
+
         return true;
     }
-    
+
     void parseProperties(Element props) {
         NodeList properties = props.getElementsByTagName("property");
-        for(int i = 0; i < properties.getLength(); i++) {
+        for (int i = 0; i < properties.getLength(); i++) {
             Element ele = (Element) properties.item(i);
             NamedNodeMap attribtutes = ele.getAttributes();
-            for(int j = 0; j+1 < attribtutes.getLength(); j += 2) {
-                this.properties.put(attribtutes.item(j).getNodeValue(), attribtutes.item(j+1).getNodeValue());
+            for (int j = 0; j + 1 < attribtutes.getLength(); j += 2) {
+                this.properties.put(attribtutes.item(j).getNodeValue(), attribtutes.item(j + 1).getNodeValue());
             }
         }
     }
